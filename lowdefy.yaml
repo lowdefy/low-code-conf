@@ -1,0 +1,106 @@
+lowdefy: 3.23.2
+name: Low-Code Day Ratings
+connections:
+  - id: conference_ratings
+    type: MongoDBCollection
+    properties:
+      databaseUri:
+        _secret: MDB_URI
+      collection: ratings
+      write: true
+pages:
+  - id: favorite-talk
+    type: PageHeaderMenu
+    requests:
+      - id: get_scores
+        type: MongoDBAggregation
+        connectionId: conference_ratings
+        properties:
+          pipeline:
+            - $group:
+                _id: 0
+                avg_lowdefy:
+                  $avg: $ratings.lowdefy_rating
+                avg_outsystems:
+                  $avg: $ratings.outsystems_rating
+                avg_linx:
+                  $avg: $ratings.linx_rating
+    events:
+      onEnter:
+        - id: fetch
+          type: Request
+          params: get_scores
+    blocks:
+      - id: center
+        type: Box
+        style:
+          maxWidth: 600
+          margin: auto
+        blocks:
+          - id: form-card
+            type: Card
+            layout:
+              contentGutter: 16
+            blocks:
+              - id: lowdefy_rating
+                type: RatingSlider
+                properties:
+                  title: How much did you like the Lowdefy talk?
+              - id: linx_rating
+                type: RatingSlider
+                properties:
+                  title: How much did you like the Linx talk?
+              - id: outsystems_rating
+                type: RatingSlider
+                properties:
+                  title: How much did you like the Outsystems talk?
+              - id: submit
+                type: Button
+                requests:
+                  - id: save_ratings
+                    type: MongoDBInsertOne
+                    connectionId: conference_ratings
+                    properties:
+                      doc:
+                        ratings:
+                          _state: true
+                        timestamp:
+                          _date: now
+                properties:
+                  size: large
+                  title: Submit
+                  block: true
+                  color: '#1890ff'
+                events:
+                  onClick:
+                    - id: save
+                      type: Request
+                      params: save_ratings
+                    - id: fetch
+                      type: Request
+                      params: get_scores
+          - id: scores-card
+            type: Card
+            properties:
+              title: Avg Rating by Talk
+            blocks:
+              - id: chart
+                type: EChart
+                properties:
+                  option:
+                    xAxis:
+                      type: category
+                      name: Talks
+                      data:
+                        - Lowdefy
+                        - Linx
+                        - Outsystems
+                    yAxis:
+                      type: 'value'
+                      name: Avg. Rating
+                    series:
+                      - type: bar
+                        data:
+                          - _request: get_scores.0.avg_lowdefy
+                          - _request: get_scores.0.avg_linx
+                          - _request: get_scores.0.avg_outsystems
